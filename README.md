@@ -7,6 +7,7 @@
 
 3.打开后就可以聊天了
 
+#
 
 Imitate WeChat chat web page
 
