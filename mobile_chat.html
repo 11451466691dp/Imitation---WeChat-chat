@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>微信聊天 (手机版)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+        body {
+            background-color: #E5E5E5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .header {
+            background-color: #07C160;
+            color: white;
+            padding: 15px 10px;
+            text-align: center;
+            font-size: 18px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 10;
+        }
+        .chat-container {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background-color: #F5F5F5;
+            padding-bottom: 70px;
+        }
+        .message {
+            max-width: 80%;
+            padding: 8px 12px;
+            border-radius: 18px;
+            margin: 5px 0;
+            position: relative;
+            word-wrap: break-word;
+            font-size: 14px;
+        }
+        .received {
+            background-color: white;
+            align-self: flex-start;
+            border-top-left-radius: 5px;
+        }
+        .sent {
+            background-color: #95EC69;
+            align-self: flex-end;
+            border-top-right-radius: 5px;
+        }
+        .message-time {
+            font-size: 10px;
+            color: #888;
+            margin-top: 3px;
+            text-align: right;
+        }
+        .message-sender {
+            font-size: 10px;
+            color: #888;
+            margin-bottom: 3px;
+        }
+        .input-area {
+            display: flex;
+            padding: 10px;
+            background-color: white;
+            border-top: 1px solid #eee;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            z-index: 10;
+        }
+        #message-input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            outline: none;
+            font-size: 14px;
+            height: 40px;
+        }
+        #send-button {
+            margin-left: 10px;
+            padding: 0 15px;
+            background-color: #07C160;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            height: 40px;
+            min-width: 60px;
+        }
+        #send-button:hover {
+            background-color: #06B158;
+        }
+        .system-message {
+            text-align: center;
+            margin: 5px 0;
+        }
+        .system-message span {
+            background-color: #D8D8D8;
+            color: #666;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+    <button id="back-button" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: white; font-size: 16px; cursor: pointer;">返回</button>
+    <span id="header-title">微信聊天</span>
+</div>
+    <div class="chat-container" id="chat-container">
+        <!-- Messages will be added here dynamically -->
+    </div>
+    <div class="input-area">
+        <input type="text" id="message-input" placeholder="输入消息...">
+        <button id="send-button">发送</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+<script>
+    // 返回按钮点击事件
+    document.getElementById('back-button').addEventListener('click', function() {
+        const username = localStorage.getItem('username');
+        window.location.href = '/room?username=' + encodeURIComponent(username);
+    });
+        // 检查用户是否已登录
+        const username = localStorage.getItem('username');
+        if (!username) {
+            // 未登录，重定向到登录页面
+            window.location.href = '/';
+        }
+
+        // 获取房间号
+        const roomId = localStorage.getItem('roomId');
+        if (!roomId) {
+            // 没有房间号，重定向到房间管理页面
+            window.location.href = '/room?username=' + encodeURIComponent(username);
+        }
+
+        // SocketIO连接，传递用户名和房间号
+        const socket = io({ query: { username: username, roomId: roomId } });
+
+        const chatContainer = document.getElementById('chat-container');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+
+        // 更新页面标题，显示当前用户名
+        document.getElementById('header-title').textContent = '微信聊天 - ' + username;
+
+        // 添加消息到聊天容器
+        function addMessage(text, isSent, sender, time) {
+            if (sender === 'server' && text.includes('加入聊天') || text.includes('离开聊天')) {
+                // 系统消息
+                const systemDiv = document.createElement('div');
+                systemDiv.className = 'system-message';
+                const span = document.createElement('span');
+                span.textContent = text;
+                systemDiv.appendChild(span);
+                chatContainer.appendChild(systemDiv);
+            } else {
+                // 普通消息
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message ' + (isSent ? 'sent' : 'received');
+
+                // 添加发送者信息
+                if (sender && !isSent) {
+                    const senderDiv = document.createElement('div');
+                    senderDiv.className = 'message-sender';
+                    senderDiv.textContent = sender === 'server' ? '系统' : sender;
+                    messageDiv.appendChild(senderDiv);
+                }
+
+                // 创建消息内容
+                const contentDiv = document.createElement('div');
+                contentDiv.textContent = text;
+                messageDiv.appendChild(contentDiv);
+
+                // 添加时间戳
+                const timeDiv = document.createElement('div');
+                timeDiv.className = 'message-time';
+                timeDiv.textContent = time || (new Date().getHours() + ':' + (new Date().getMinutes() < 10 ? '0' : '') + new Date().getMinutes());
+                messageDiv.appendChild(timeDiv);
+
+                chatContainer.appendChild(messageDiv);
+            }
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // 发送消息
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message) {
+                socket.emit('message', { message: message, sender: username });
+                messageInput.value = '';
+            }
+        }
+
+        // 发送按钮点击事件
+        sendButton.addEventListener('click', sendMessage);
+
+        // 回车键发送消息
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // 接收消息
+        socket.on('message', (data) => {
+            console.log('Received message:', data);
+            if (data.message) {
+                const isSent = data.sender === username;
+                addMessage(data.message, isSent, data.sender, data.time);
+            }
+        });
+
+        // 错误处理
+        socket.io.on('error', (error) => {
+            console.error('SocketIO error:', error);
+            addMessage('连接出错，请刷新页面重试', false, 'server');
+        });
+
+        // 断开连接
+        socket.on('disconnect', () => {
+            console.log('SocketIO connection closed');
+            addMessage('连接已关闭，请刷新页面重试', false, 'server');
+        });
+
+        // 连接成功
+        socket.on('connect', () => {
+            console.log('SocketIO connection established for user:', username);
+            addMessage('连接成功，可以开始聊天了', false, 'server');
+        });
+
+        // 接收聊天历史
+        socket.on('chat_history', (data) => {
+            if (data.history && data.history.length > 0) {
+                chatContainer.innerHTML = ''; // 清空现有消息
+                data.history.forEach(msg => {
+                    const isSent = msg.sender === username;
+                    addMessage(msg.message, isSent, msg.sender, msg.time);
+                });
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户主页 - 仿微信聊天</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+
+        :root {
+            --bg-color: #f2f2f2;
+            --card-bg: white;
+            --primary-color: #07C160;
+            --text-color: #333;
+            --gray-color: #666;
+            --light-gray: #e0e0e0;
+            --shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            background-color: var(--bg-color);
+            min-height: 100vh;
+            transition: background-color 0.3s;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .profile-card {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            padding: 25px;
+            margin-bottom: 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .avatar-container {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 15px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 3px solid var(--primary-color);
+            cursor: pointer;
+        }
+
+        .avatar {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s;
+            border-radius: 50%;
+        }
+
+        .avatar-container:hover .avatar {
+            transform: scale(1.05);
+        }
+
+        .avatar-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .avatar-container:hover .avatar-overlay {
+            opacity: 1;
+        }
+
+        .avatar-overlay i {
+            color: white;
+            font-size: 24px;
+        }
+
+        .username {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--text-color);
+            margin-bottom: 5px;
+        }
+
+        .register-date {
+            font-size: 14px;
+            color: var(--gray-color);
+            margin-bottom: 20px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .feature-card {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .feature-icon {
+            font-size: 36px;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        .feature-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: var(--text-color);
+        }
+
+        #avatar-input {
+            display: none;
+        }
+
+        /* 模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            border-radius: 10px;
+            padding: 25px;
+            width: 90%;
+            max-width: 500px;
+            position: relative;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--gray-color);
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: var(--text-color);
+        }
+
+        .color-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .color-option {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+
+        .color-option.selected {
+            border-color: var(--primary-color);
+        }
+
+        .btn {
+            padding: 12px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            width: 100%;
+        }
+
+        .btn:hover {
+            background-color: #06AD56;
+        }
+
+        .btn-secondary {
+            background-color: var(--light-gray);
+            color: var(--text-color);
+            margin-top: 10px;
+        }
+
+        .btn-secondary:hover {
+            background-color: #d0d0d0;
+        }
+    </style>
+    <!-- 引入Font Awesome图标 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <div class="profile-card">
+            <button id="logout-btn" style="position: absolute; top: 15px; right: 15px; background-color: #f44336; color: white; border: none; border-radius: 5px; padding: 8px 15px; cursor: pointer; font-size: 14px;">退出</button>
+            <label for="avatar-input" class="avatar-container">
+                <img id="user-avatar" class="avatar" src="default-avatar.png" alt="用户头像">
+                <div class="avatar-overlay">
+                    <i class="fas fa-camera"></i>
+                </div>
+            </label>
+            <input type="file" id="avatar-input" accept="image/*">
+            <h1 id="user-name" class="username">加载中...</h1>
+            <p class="register-date">注册时间: <span id="register-date"></span></p>
+        </div>
+
+        <div class="features-grid">
+            <div class="feature-card" id="avatar-feature">
+                <i class="fas fa-user-circle feature-icon"></i>
+                <h3 class="feature-title">设置头像</h3>
+            </div>
+
+            <div class="feature-card" id="room-feature">
+                <i class="fas fa-users feature-icon"></i>
+                <h3 class="feature-title">房间</h3>
+            </div>
+
+            <div class="feature-card" id="theme-feature">
+                <i class="fas fa-palette feature-icon"></i>
+                <h3 class="feature-title">切换背景</h3>
+            </div>
+
+            <div class="feature-card" id="cache-feature">
+                <i class="fas fa-trash-alt feature-icon"></i>
+                <h3 class="feature-title">清理缓存</h3>
+            </div>
+        </div>
+    </div>
+
+    <!-- 背景颜色选择模态框 -->
+    <div class="modal" id="theme-modal">
+        <div class="modal-content">
+            <span class="close-modal" id="close-theme-modal">&times;</span>
+            <h2 class="modal-title">选择背景颜色</h2>
+            <div class="color-options">
+                <div class="color-option selected" data-color="#f2f2f2"></div>
+                <div class="color-option" data-color="#e8f5e9"></div>
+                <div class="color-option" data-color="#e3f2fd"></div>
+                <div class="color-option" data-color="#f3e5f5"></div>
+                <div class="color-option" data-color="#fff3e0"></div>
+                <div class="color-option" data-color="#ffebee"></div>
+            </div>
+            <button class="btn" id="confirm-theme">确认</button>
+            <button class="btn btn-secondary" id="cancel-theme">取消</button>
+        </div>
+    </div>
+
+    <!-- 清理缓存确认模态框 -->
+    <div class="modal" id="cache-modal">
+        <div class="modal-content">
+            <span class="close-modal" id="close-cache-modal">&times;</span>
+            <h2 class="modal-title">清理上传缓存</h2>
+            <p style="margin-bottom: 20px;">确定要清理所有上传的文件缓存吗？此操作不可恢复。</p>
+            <button class="btn" id="confirm-cache">确认清理</button>
+            <button class="btn btn-secondary" id="cancel-cache">取消</button>
+        </div>
+    </div>
+
+    <script>
+        // 获取URL中的用户名参数
+        const urlParams = new URLSearchParams(window.location.search);
+        const username = urlParams.get('username');
+
+        if (!username) {
+            // 如果没有用户名参数，重定向到登录页面
+            window.location.href = 'login.html';
+        }
+
+        // 设置颜色选项的背景色
+        document.querySelectorAll('.color-option').forEach(option => {
+            option.style.backgroundColor = option.getAttribute('data-color');
+        });
+
+        // 加载用户信息
+        function loadUserInfo() {
+            fetch('/get_user_info?username=' + encodeURIComponent(username))
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('user-name').textContent = username;
+                        document.getElementById('register-date').textContent = data.user.registered_at;
+
+                        // 设置头像
+                        if (data.user.avatar) {
+                            document.getElementById('user-avatar').src = data.user.avatar;
+                        } else {
+                            document.getElementById('user-avatar').src = 'default-avatar.png';
+                        }
+                    } else {
+                        alert('加载用户信息失败: ' + data.message);
+                        window.location.href = 'login.html';
+                    }
+                })
+                .catch(error => {
+                    console.error('加载用户信息出错:', error);
+                    alert('加载用户信息出错，请重试');
+                });
+        }
+
+        // 上传头像
+        document.getElementById('avatar-input').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('username', username);
+
+            fetch('/upload_avatar', {method: 'POST', body: formData})
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('user-avatar').src = data.avatar_url + '?' + new Date().getTime();
+                        alert('头像上传成功');
+                    } else {
+                        alert('头像上传失败: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('上传头像出错:', error);
+                    alert('上传头像出错，请重试');
+                });
+        });
+
+        // 点击设置头像功能
+        document.getElementById('avatar-feature').addEventListener('click', function() {
+            document.getElementById('avatar-input').click();
+        });
+
+        // 点击房间功能
+        document.getElementById('room-feature').addEventListener('click', function() {
+            window.location.href = 'room.html?username=' + encodeURIComponent(username);
+        });
+
+        // 点击切换背景功能
+        document.getElementById('theme-feature').addEventListener('click', function() {
+            document.getElementById('theme-modal').style.display = 'flex';
+        });
+
+        // 关闭背景颜色模态框
+        document.getElementById('close-theme-modal').addEventListener('click', function() {
+            document.getElementById('theme-modal').style.display = 'none';
+        });
+
+        document.getElementById('cancel-theme').addEventListener('click', function() {
+            document.getElementById('theme-modal').style.display = 'none';
+        });
+
+        // 选择背景颜色
+        document.querySelectorAll('.color-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.color-option').forEach(opt => opt.classList.remove('selected'));
+                this.classList.add('selected');
+            });
+        });
+
+        // 确认背景颜色
+        document.getElementById('confirm-theme').addEventListener('click', function() {
+            const selectedColor = document.querySelector('.color-option.selected').getAttribute('data-color');
+            document.documentElement.style.setProperty('--bg-color', selectedColor);
+
+            // 保存背景颜色设置
+            fetch('/save_theme', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: username, theme: selectedColor})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    alert('保存主题失败: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('保存主题出错:', error);
+            });
+
+            document.getElementById('theme-modal').style.display = 'none';
+        });
+
+        // 点击清理缓存功能
+        document.getElementById('cache-feature').addEventListener('click', function() {
+            document.getElementById('cache-modal').style.display = 'flex';
+        });
+
+        // 关闭清理缓存模态框
+        document.getElementById('close-cache-modal').addEventListener('click', function() {
+            document.getElementById('cache-modal').style.display = 'none';
+        });
+
+        document.getElementById('cancel-cache').addEventListener('click', function() {
+            document.getElementById('cache-modal').style.display = 'none';
+        });
+
+        // 确认清理缓存
+        document.getElementById('confirm-cache').addEventListener('click', function() {
+            fetch('/clear_cache?username=' + encodeURIComponent(username))
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('缓存清理成功');
+                    } else {
+                        alert('缓存清理失败: ' + data.message);
+                    }
+                    document.getElementById('cache-modal').style.display = 'none';
+                })
+                .catch(error => {
+                    console.error('清理缓存出错:', error);
+                    alert('清理缓存出错，请重试');
+                    document.getElementById('cache-modal').style.display = 'none';
+                });
+        });
+
+        // 点击模态框外部关闭
+        window.addEventListener('click', function(e) {
+            if (e.target.classList.contains('modal')) {
+                e.target.style.display = 'none';
+            }
+        });
+
+        // 退出功能
+        document.getElementById('logout-btn').addEventListener('click', function() {
+            if (confirm('确定要退出登录吗？')) {
+                window.location.href = 'login.html';
+            }
+        });
+
+        // 页面加载完成后加载用户信息
+        window.addEventListener('DOMContentLoaded', loadUserInfo);
+    </script>
+</body>
+</html>

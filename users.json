@@ -1,0 +1,19 @@
+{
+  "users": {
+    "嘎嘎嘎": {
+      "password": "$2b$12$QiQRxS1Od/ACVZ9DwQ0tOOli0rEB/KrsGq4RMx11qj960CH.Y81qC",
+      "registered_at": "2025-07-31 19:57:41"
+    },
+    "1234": {
+      "password": "$2b$12$71h8vGh418AH4qoELn.3y.qWwjc6jSJyvgFrwmeWw3.zJVHTpcqfC",
+      "registered_at": "2025-07-31 19:58:50",
+      "avatar": "/avatars/1234_108c4887-660f-43d3-a48d-8e1585985fe6.png",
+      "theme": "#e8f5e9"
+    },
+    "恩恩": {
+      "password": "$2b$12$iCYLzjcD3XMPov2ovYJcb.uH17zsE/laknOEHYtqQ0gMEGDodvVg6",
+      "registered_at": "2025-07-31 20:00:23",
+      "theme": "#e3f2fd"
+    }
+  }
+}

@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>房间管理</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+        :root {
+            --bg-color: #E5E5E5;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.3s;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 400px;
+        }
+        .header {
+            background-color: #07C160;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            border-radius: 10px 10px 0 0;
+            margin: -30px -30px 20px -30px;
+            font-size: 18px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        button {
+            flex: 1;
+            padding: 12px;
+            background-color: #07C160;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #06B158;
+        }
+        .back-button {
+            background-color: #ccc;
+            margin-top: 15px;
+        }
+        .back-button:hover {
+            background-color: #bbb;
+        }
+        .error-message {
+            color: #e74c3c;
+            margin-top: 10px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">房间管理</div>
+        <div class="input-group">
+            <label for="room-id">房间号</label>
+            <input type="text" id="room-id" placeholder="输入6位或更多位数字房间号">
+        </div>
+        <div class="button-group">
+            <button id="create-room">创建房间</button>
+            <button id="join-room">加入房间</button>
+        </div>
+        <button class="back-button" id="back-button">返回登录页</button>
+        <div class="error-message" id="error-message"></div>
+    </div>
+
+    <script>
+        // 加载用户主题设置
+        function loadUserTheme() {
+            // 从localStorage获取用户名
+            const username = localStorage.getItem('username');
+
+            if (username) {
+                // 有用户名，从服务器获取主题设置
+                fetch('/get_theme?username=' + encodeURIComponent(username))
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.theme) {
+                            document.documentElement.style.setProperty('--bg-color', data.theme);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('加载主题设置出错:', error);
+                    });
+            }
+        }
+
+        // 页面加载完成后加载用户主题
+        window.addEventListener('DOMContentLoaded', loadUserTheme);
+        // 检查用户是否已登录
+        const username = localStorage.getItem('username');
+        if (!username) {
+            // 未登录，重定向到登录页面
+            window.location.href = '/';
+        }
+
+        const roomIdInput = document.getElementById('room-id');
+        const createRoomButton = document.getElementById('create-room');
+        const joinRoomButton = document.getElementById('join-room');
+        const backButton = document.getElementById('back-button');
+        const errorMessage = document.getElementById('error-message');
+
+        // 创建房间
+        createRoomButton.addEventListener('click', async () => {
+            const roomId = roomIdInput.value.trim();
+            if (!isValidRoomId(roomId)) {
+                showError('请输入6位或更多位数字房间号');
+                return;
+            }
+
+            // 显示加载状态
+            createRoomButton.disabled = true;
+            createRoomButton.textContent = '创建中...';
+            errorMessage.textContent = '';
+
+            try {
+                // 调用创建房间API
+                const response = await fetch(`/create_room?username=${encodeURIComponent(username)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ room_id: roomId })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // 创建成功，存储房间号到localStorage
+                    localStorage.setItem('roomId', roomId);
+
+                    // 检测是否为移动设备
+                    const isMobile = window.innerWidth <= 768;
+                    const chatPage = isMobile ? '/mobile_chat' : '/chat';
+
+                    // 重定向到聊天页面
+                    window.location.href = `${chatPage}?username=${encodeURIComponent(username)}&roomId=${roomId}`;
+                } else {
+                    showError(data.message || '创建房间失败');
+                }
+            } catch (error) {
+                showError('网络错误，请重试');
+                console.error('Create room error:', error);
+            } finally {
+                // 恢复按钮状态
+                createRoomButton.disabled = false;
+                createRoomButton.textContent = '创建房间';
+            }
+        });
+
+        // 加入房间
+        joinRoomButton.addEventListener('click', async () => {
+            const roomId = roomIdInput.value.trim();
+            if (!isValidRoomId(roomId)) {
+                showError('请输入6位或更多位数字房间号');
+                return;
+            }
+
+            // 显示验证中状态
+            errorMessage.textContent = '正在验证房间...';
+            errorMessage.style.color = 'blue';
+            joinRoomButton.disabled = true;
+            joinRoomButton.textContent = '验证中...';
+
+            try {
+                // 调用检查房间API
+                const response = await fetch('/check_room', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ room_id: roomId })
+                });
+
+                const data = await response.json();
+
+                if (data.exists) {
+                    // 房间存在，显示成功消息
+                    errorMessage.textContent = '房间验证成功，正在进入...';
+                    errorMessage.style.color = 'green';
+
+                    // 存储房间号到localStorage
+                    localStorage.setItem('roomId', roomId);
+
+                    // 检测是否为移动设备
+                    const isMobile = window.innerWidth <= 768;
+                    const chatPage = isMobile ? '/mobile_chat' : '/chat';
+
+                    // 延迟重定向
+                    setTimeout(() => {
+                        window.location.href = `${chatPage}?username=${encodeURIComponent(username)}&roomId=${roomId}`;
+                    }, 1000);
+                } else {
+                    // 房间不存在
+                    errorMessage.textContent = '房间不存在，请先创建房间';
+                    errorMessage.style.color = 'red';
+                }
+            } catch (error) {
+                // 网络错误
+                errorMessage.textContent = '验证房间时出错，请重试';
+                errorMessage.style.color = 'red';
+                console.error('Check room error:', error);
+            } finally {
+                // 恢复按钮状态
+                joinRoomButton.disabled = false;
+                joinRoomButton.textContent = '加入房间';
+            }
+        });
+
+        // 返回登录页
+        backButton.addEventListener('click', () => {
+            window.location.href = '/';
+        });
+
+        // 验证房间号格式
+        function isValidRoomId(roomId) {
+            // 检查是否为6位或更多位数字
+            const regex = /^\d{6,}$/;
+            return regex.test(roomId);
+        }
+
+        // 显示错误消息
+        function showError(message) {
+            errorMessage.textContent = message;
+            setTimeout(() => {
+                errorMessage.textContent = '';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

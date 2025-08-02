@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>仿微信聊天</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+        body {
+            background-color: #E5E5E5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background-color: #07C160;
+            color: white;
+            padding: 10px 15px;
+            text-align: center;
+            font-size: 18px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        .chat-container {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .message {
+            max-width: 70%;
+            padding: 10px 15px;
+            border-radius: 18px;
+            margin: 5px 0;
+            position: relative;
+            word-wrap: break-word;
+        }
+        .received {
+            background-color: white;
+            align-self: flex-start;
+            border-top-left-radius: 5px;
+        }
+        .sent {
+            background-color: #95EC69;
+            align-self: flex-end;
+            border-top-right-radius: 5px;
+        }
+        .message-time {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+            text-align: right;
+        }
+        .input-area {
+            display: flex;
+            padding: 10px;
+            background-color: white;
+            border-top: 1px solid #eee;
+        }
+        #message-input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            outline: none;
+            font-size: 14px;
+        }
+        #send-button {
+            margin-left: 10px;
+            padding: 10px 20px;
+            background-color: #07C160;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        #send-button:hover {
+            background-color: #06B158;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+    <button id="back-button" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: white; font-size: 16px; cursor: pointer;">返回</button>
+    <span id="header-title">微信聊天</span>
+</div>
+    <div class="chat-container" id="chat-container">
+        <!-- Messages will be added here dynamically -->
+    </div>
+    <div class="input-area">
+        <div style="display: flex; flex-direction: column; width: 100%;">
+            <input type="file" id="file-input" style="display: none;">
+            <button id="file-button" style="align-self: flex-start; padding: 5px 10px; margin-bottom: 5px; background-color: #eee; border: 1px solid #ddd; border-radius: 5px; cursor: pointer;">选择文件</button>
+            <input type="text" id="message-input" placeholder="输入消息..." style="flex: 1; padding: 10px 15px; border: 1px solid #ddd; border-radius: 20px; outline: none; font-size: 14px;">
+        </div>
+        <button id="send-button" style="margin-left: 10px; padding: 10px 20px; background-color: #07C160; color: white; border: none; border-radius: 20px; cursor: pointer; font-size: 14px;">发送</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+<script>
+    // 返回按钮点击事件
+    document.getElementById('back-button').addEventListener('click', function() {
+        const username = localStorage.getItem('username');
+        window.location.href = '/room?username=' + encodeURIComponent(username);
+    });
+        // 检查用户是否已登录
+        const username = localStorage.getItem('username');
+        if (!username) {
+            // 未登录，重定向到登录页面
+            window.location.href = '/';
+        }
+
+        // 获取房间号
+        const roomId = localStorage.getItem('roomId');
+        if (!roomId) {
+            // 没有房间号，重定向到房间管理页面
+            window.location.href = '/room?username=' + encodeURIComponent(username);
+        }
+
+        // SocketIO connection for real-time chat，传递用户名和房间号
+        const socket = io({ query: { username: username, roomId: roomId } });
+
+        const chatContainer = document.getElementById('chat-container');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+
+        // 更新页面标题，显示当前用户名
+        document.getElementById('header-title').textContent = '微信聊天 - ' + username;
+
+        // Function to add message to chat container
+        function addMessage(text, isSent, sender, time) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ' + (isSent ? 'sent' : 'received');
+
+            // Create message content
+            const contentDiv = document.createElement('div');
+            contentDiv.textContent = text;
+            messageDiv.appendChild(contentDiv);
+
+            // Add timestamp
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = time || (new Date().getHours() + ':' + (new Date().getMinutes() < 10 ? '0' : '') + new Date().getMinutes());
+            messageDiv.appendChild(timeDiv);
+
+            // Add sender info if available
+            if (sender && !isSent) {
+                const senderDiv = document.createElement('div');
+                senderDiv.className = 'message-sender';
+                senderDiv.style.fontSize = '12px';
+                senderDiv.style.color = '#888';
+                senderDiv.style.marginBottom = '5px';
+                senderDiv.textContent = sender === 'server' ? '系统' : sender;
+                messageDiv.insertBefore(senderDiv, contentDiv);
+            }
+
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // 不再需要这个函数，已通过SocketIO实现聊天历史加载
+
+        // Send message when button is clicked
+        sendButton.addEventListener('click', () => {
+            const message = messageInput.value.trim();
+            if (message) {
+                socket.emit('message', { message: message, sender: username });
+                messageInput.value = '';
+            }
+        });
+
+        // Send message when Enter key is pressed
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendButton.click();
+            }
+        });
+
+        // Handle incoming messages from SocketIO
+        socket.on('message', (data) => {
+        console.log('Received message:', data);
+        if (data.type === 'file') {
+            // For file messages
+            console.log('Received file message:', data);
+            const isSent = data.sender === username;
+            addFileMessage(data.file_name, data.file_url, data.file_size, isSent, data.sender, data.time);
+        } else if (data.message) {
+            // For system and regular messages
+            if (data.type === 'system') {
+                addMessage(data.message, false, 'server', data.time);
+            } else {
+                // For regular messages
+                const isSent = data.sender === username;
+                addMessage(data.message, isSent, data.sender, data.time);
+            }
+        }
+    });
+
+        // Function to add file message to chat container
+        function addFileMessage(fileName, fileUrl, fileSize, isSent, sender, time) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ' + (isSent ? 'sent' : 'received');
+
+            // Add sender info if available
+            if (sender && !isSent) {
+                const senderDiv = document.createElement('div');
+                senderDiv.className = 'message-sender';
+                senderDiv.style.fontSize = '12px';
+                senderDiv.style.color = '#888';
+                senderDiv.style.marginBottom = '5px';
+                senderDiv.textContent = sender === 'server' ? '系统' : sender;
+                messageDiv.appendChild(senderDiv);
+            }
+
+            // Create file link
+            const fileLink = document.createElement('a');
+            fileLink.href = fileUrl;
+            fileLink.target = '_blank';
+            fileLink.download = fileName;
+            fileLink.style.display = 'flex';
+            fileLink.style.alignItems = 'center';
+            fileLink.style.color = '#07C160';
+            fileLink.style.textDecoration = 'none';
+
+            // File icon
+            const fileIcon = document.createElement('span');
+            fileIcon.textContent = '📎 ';
+            fileLink.appendChild(fileIcon);
+
+            // File name
+            const fileNameSpan = document.createElement('span');
+            fileNameSpan.textContent = fileName;
+            fileLink.appendChild(fileNameSpan);
+
+            // File size
+            const fileSizeSpan = document.createElement('span');
+            fileSizeSpan.textContent = ` (${formatFileSize(fileSize)})`;
+            fileSizeSpan.style.fontSize = '12px';
+            fileSizeSpan.style.color = '#888';
+            fileSizeSpan.style.marginLeft = '5px';
+            fileLink.appendChild(fileSizeSpan);
+
+            messageDiv.appendChild(fileLink);
+
+            // Add timestamp
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = time || (new Date().getHours() + ':' + (new Date().getMinutes() < 10 ? '0' : '') + new Date().getMinutes());
+            messageDiv.appendChild(timeDiv);
+
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // Function to format file size
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            else return (bytes / 1048576).toFixed(1) + ' MB';
+        }
+
+        // File button click event
+        document.getElementById('file-button').addEventListener('click', function() {
+            document.getElementById('file-input').click();
+        });
+
+        // File selection event
+        document.getElementById('file-input').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                // Create FormData to send file
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('username', username);
+                formData.append('room_id', roomId);
+
+                // Show loading state
+                addMessage(`正在上传文件: ${file.name} (${formatFileSize(file.size)})`, true, username);
+
+                // Send file to server
+                fetch('/upload_file', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // File uploaded successfully
+                        // The server will broadcast the file message
+                    } else {
+                        addMessage(`文件上传失败: ${data.message}`, true, username);
+                    }
+                })
+                .catch(error => {
+                    console.error('File upload error:', error);
+                    addMessage('文件上传出错，请重试', true, username);
+                });
+
+                // Clear file input
+                this.value = '';
+            }
+        });
+
+        // Handle SocketIO errors
+        socket.io.on('error', (error) => {
+            console.error('SocketIO error:', error);
+            addMessage('连接出错，请刷新页面重试', false, 'server');
+        });
+
+        // Handle SocketIO disconnect
+        socket.on('disconnect', () => {
+            console.log('SocketIO connection closed');
+            addMessage('连接已关闭，请刷新页面重试', false, 'server');
+        });
+
+        // Handle SocketIO connection
+        socket.on('connect', () => {
+            console.log('SocketIO connection established for user:', username);
+            addMessage('连接成功，可以开始聊天了', false, 'server');
+        });
+
+        // Handle chat history response
+        socket.on('chat_history', (data) => {
+            if (data.history && data.history.length > 0) {
+                chatContainer.innerHTML = ''; // Clear existing messages
+                data.history.forEach(msg => {
+                    const isSent = msg.sender === username;
+                    addMessage(msg.message, isSent, msg.sender, msg.time);
+                });
+            }
+        });
+
+        // 聊天历史已通过SocketIO连接事件加载，无需在页面加载时额外调用
+    </script>
+</body>
+</html>
